@@ -134,6 +134,7 @@ def update_chart_grid(n_click, selected_values, heatmap_select, alt_figure_data=
     Output('top-area', 'children'),
     Output('chart-grid-area', 'children'),
     Output('tabs-area', 'children'),
+    Output('saved-data-provider-selection', 'options'),
 
     *[Input(f'chart-{i + 1}', 'hoverData') for i in range(6)],
     Input('update-charts-button', 'n_clicks'),
@@ -141,24 +142,28 @@ def update_chart_grid(n_click, selected_values, heatmap_select, alt_figure_data=
     Input('width-input', 'value'),
     Input('saved-data-provider-selection', 'value'),
     Input('start-calculation-button', 'n_clicks'),
+    Input('apply-changes-button', 'n_clicks'),
 
     *[State(f'chart-{i + 1}', 'figure') for i in range(6)],
-    State('base-instance-id-input', 'value'),  # instance
-    State('width-input', 'value'),  # width
-    State('charts-dimensions-selection', 'value'),  # dims
+    State('base-instance-id-input', 'value'),
+    State('width-input', 'value'),
+    State('charts-dimensions-selection', 'value'),
     State('charts-optional-element-selection', 'value'),
     State('charts-data-provider-selection', 'value'),
+    *[State(f'feat-{i}', 'value') for i in range(1, len(data_provider.feature_names) + 1)]
 )
-def update_visuals(
+def combined_callback(
         hover_data_1, hover_data_2, hover_data_3, hover_data_4, hover_data_5, hover_data_6,
-        update_dimensions_button_n_clicks, dataset_input, width_input, saved_data_provider_selection, start_calculation_button_n_clicks,
+        update_charts_button_n_clicks, dataset_input, width_input, saved_data_provider_selection, start_calculation_button_n_clicks,
+        apply_changes_button_n_clicks,
         figure_1, figure_2, figure_3, figure_4, figure_5, figure_6,
-        base_instance_id_input_state, width_input_state, charts_dimensions_selection, charts_optional_element_selection, charts_data_provider_selection
+        base_instance_id_input_state, width_input_state, charts_dimensions_selection, charts_optional_element_selection,
+        charts_data_provider_selection, *feature_values
 ):
     ctx = dash.callback_context
     triggered_id = ctx.triggered[0]['prop_id'].split('.')[0]
     selected_tuples = [tuple(map(int, val.strip('()').split(','))) for val in charts_dimensions_selection]
-    return_values = [no_update for x in range(9)]
+    return_values = [no_update for x in range(10)]
     global data_provider_list
     global data_provider
 
@@ -187,12 +192,11 @@ def update_visuals(
         return_values[:6] = handle_hover(chart_index)
 
     if triggered_id == 'dataset-input':
-
         data_provider_list = []
         data_provider.setRequestedDims(selected_tuples)
         data_provider.change_dataset(dataset_input)
         data_provider_list.append(data_provider)
-        updated_charts = update_chart_grid(update_dimensions_button_n_clicks, selected_tuples,
+        updated_charts = update_chart_grid(update_charts_button_n_clicks, selected_tuples,
                                            charts_optional_element_selection, alt_figure_data=temp)
 
         dropdown_component = create_tabs_component(data_provider, data_provider_list)
@@ -215,20 +219,21 @@ def update_visuals(
 
     if triggered_id == 'update-charts-button':
         data_provider.setRequestedDims(selected_tuples)
-        updated_charts = update_chart_grid(update_dimensions_button_n_clicks, selected_tuples, charts_optional_element_selection, alt_figure_data=temp)
+        updated_charts = update_chart_grid(update_charts_button_n_clicks, selected_tuples, charts_optional_element_selection, alt_figure_data=temp)
         return_values[:6] = updated_charts
 
     if triggered_id == 'start-calculation-button':
-        old_provider = copy.deepcopy(data_provider)
-        data_provider_list.append(old_provider)
 
-        data_provider.base_instance_id = base_instance_id_input_state
-        data_provider.width = float(width_input_state)
-        data_provider.setRequestedDims(selected_tuples)
-        #data_provider.setRequestedDims([])
-        data_provider.redoCalculation(dataset_input)
+        new_provider: DataProvider = copy.deepcopy(data_provider)
+        new_provider.base_instance_id = base_instance_id_input_state
+        new_provider.width = float(width_input_state)
+        new_provider.setRequestedDims(selected_tuples)
+        new_provider.redoCalculation(dataset_input)
+        data_provider_list.append(new_provider)
+        data_provider = new_provider
+        data_provider.temp_feature_values =  [None for x in range(len(data_provider.base_instance))]
 
-        updated_charts = update_chart_grid(update_dimensions_button_n_clicks, selected_tuples, charts_optional_element_selection, alt_figure_data=temp)
+        updated_charts = update_chart_grid(update_charts_button_n_clicks, selected_tuples, charts_optional_element_selection, alt_figure_data=temp)
         return_values[:6] = updated_charts
 
         dropdown_component = create_tabs_component(data_provider, data_provider_list)
@@ -239,28 +244,18 @@ def update_visuals(
         return_values[7] = chart_grid_component
         return_values[8] = dropdown_component
 
+    if triggered_id == 'apply-changes-button':
+        print(feature_values)
+        options = [{
+            'label': ' | '.join(f'{x:.5f}' for x in value.base_instance),
+            'value': index} for index, value in enumerate(data_provider_list)]
+
+        if apply_changes_button_n_clicks > 0:
+            data_provider.temp_feature_values = feature_values
+
+        return_values[9] = options
+
     return return_values
-
-
-@app.callback(
-    #Output('apply-changes-button', 'children'),
-    Output('saved-data-provider-selection', 'options'),
-    Input('apply-changes-button', 'n_clicks'),
-    *[State(f'feat-{i}', 'value') for i in range(1, len(data_provider.feature_names) + 1)]
-)
-def apply_instance_changes(n_clicks, *feature_values):
-    options = [{
-                   'label': ' | '.join(f'{x:.5f}' for x in value.base_instance),
-                   'value': index} for index, value in enumerate(data_provider_list)]
-
-    if n_clicks == 0:
-        #return ' | '.join(f'{x:.5f}' for x in feature_values), options
-        return options
-    old_provider = copy.deepcopy(data_provider)
-    data_provider_list.append(old_provider)
-    data_provider.temp_feature_values = feature_values
-    return options
-    #return ' | '.join(f'{x:.5f}' for x in feature_values), options
 
 
 @app.callback(
