@@ -1,23 +1,24 @@
 import numpy as np
 import plotly.graph_objects as go
 from dash import dcc, html
-from dash_app.colors import Color
 from dataProvider import DataProvider
 
-def create_chart_grid_component(data_provider: DataProvider, data_provider_list=None):
+'''
+this file contains all methods needed for creating the chart component or the charts themself
+'''
+def create_chart_grid_component(data_provider_list=None):
 
-    llll = []
+    all_figure_data = []
     dims_idx = 0
 
     for provider in data_provider_list:
         dat = provider.get_all_figure_data()
-        llll.append(dat[dims_idx])
+        all_figure_data.append(dat[dims_idx])
 
-    figures, colors = createAllCharts(llll)
+    figures, colors = createAllCharts(all_figure_data)
 
     return html.Div(
         [
-
             html.Div(
                 id='chart-grid-container',
                 children=[
@@ -64,8 +65,6 @@ def createAllCharts(all_figure_data, highlight_instance=None, heatmap_select='z1
     return figures, colors
 
 
-
-
 def createFig(figure_data: dict, highlight_instance=None, heatmap_select='z1'):
     instance = figure_data['instance']
     line_data = figure_data['line_data']
@@ -76,8 +75,6 @@ def createFig(figure_data: dict, highlight_instance=None, heatmap_select='z1'):
     points = figure_data['points']
     all_probs = figure_data['all_probs']
     class_colors = figure_data['class_colors']
-    print('class_colors')
-    print(class_colors)
 
     feat_name_x, feat_name_y = figure_data['feature_names']
 
@@ -87,8 +84,6 @@ def createFig(figure_data: dict, highlight_instance=None, heatmap_select='z1'):
 
     limits = [x_values[0], x_values[-1], y_values[0], y_values[-1]]
 
-
-    # set create standart heatmap
     heat_map: go.Heatmap = create_class_area_heatmap(points, all_probs, relevant_features, class_colors, len(class_colors))
 
     if heatmap_select.startswith('z2_'):
@@ -100,21 +95,23 @@ def createFig(figure_data: dict, highlight_instance=None, heatmap_select='z1'):
         feat_name_1 = f'feature{relevant_features[0] + 1}'
         feat_name_2 = f'feature{relevant_features[1] + 1}'
 
-        pdp_info_dict = figure_data['pdp_data']
-        feat1_2_data = pdp_info_dict[tuple([feat_name_1, feat_name_2])]
+        feat_name_1 = feat_name_x
+        feat_name_2 = feat_name_y
 
-        index = heatmap_select.split('_')[1]
-        index = int(index)
-        heat_map = create_pdp_heatmap_by_class(feat1_2_data, index, limits)
+        pdp_info_dict = figure_data['pdp_data']
+        try:
+            feat1_2_data = pdp_info_dict[tuple([feat_name_1, feat_name_2])]
+            index = heatmap_select.split('_')[1]
+            index = int(index)
+            heat_map = create_pdp_heatmap_by_class(feat1_2_data, index, limits)
+        except Exception as e:
+            raise ValueError(f'pdp could not be calculated for feature pair: {feat_name_1} / {feat_name_2}. reason: insufficient variability')
+
 
     labels = instances_to_add[1]
     instance_label = figure_data['instance_label']
-    #colors = ['blue' if label == 1 else 'yellow' if label == 2 else 'black' if label == 3 else 'purple' for label in labels]
-    #colors = [getattr(Color, f"CLASS_{label}_PRIMARY_COLOR").value for label in labels]
-    print('labels')
-    print(labels)
+
     colors = [class_colors[int(label)] for label in labels]
-    #nears_prediction_colors = ['blue' if pred == 1 else 'yellow' if pred == 2 else 'black' if pred == 3 else 'purple' for pred in prediction_near_instances]
     nears_prediction_colors = [class_colors[pred] for pred in prediction_near_instances]
 
     if heatmap_select.startswith('z5_'):
@@ -128,7 +125,6 @@ def createFig(figure_data: dict, highlight_instance=None, heatmap_select='z1'):
         colors = [value for value in normalized_values]
         nears_prediction_colors = colors
 
-    #instance_color = ['blue' if instance_label == 1 else 'yellow' if instance_label == 2 else 'black' if instance_label == 3 else 'purple']
     instance_color = [class_colors[int(instance_label)]]
     if highlight_instance is not None:
         index = None
@@ -155,10 +151,6 @@ def createFig(figure_data: dict, highlight_instance=None, heatmap_select='z1'):
     for trace in decision_boundary_traces:
         fig.add_trace(trace)
 
-    #if heatmap_select == 'z4':
-    #    shap_trace = create_shap_visuals(limits, shap_df, relevant_features[0], relevant_features[1], 0)
-    #    fig.add_trace(shap_trace)
-
     fig.update_layout(
         title={
             'text': ' | '.join(f'{x:.4f}' for x in instance),
@@ -178,9 +170,7 @@ def createFig(figure_data: dict, highlight_instance=None, heatmap_select='z1'):
 
 
 def create_pdp_heatmap_by_class(pdp_interact, class_idx, limits):
-    print(pdp_interact.results)
-    print('class_idx pdp')
-    print(class_idx)
+
     pdp_results = pdp_interact.results[class_idx]
     feat1_name, feat2_name = pdp_interact.feature_names
     feat1_values = [combo[0] for combo in pdp_interact.feature_grid_combos]
@@ -212,7 +202,6 @@ def create_pdp_heatmap_by_class(pdp_interact, class_idx, limits):
         zmax=1
 
     )
-
     return map
 
 
@@ -287,7 +276,6 @@ def create_decision_boundary_traces(line_data):
             showlegend=False
         )
         traces.append(trace)
-
     return traces
 
 
@@ -337,7 +325,6 @@ def create_scatter_trace(instances, relevant_features, label_color, prediction_c
             showlegend=False,
             customdata=customdata,
         )
-
 
 
 def create_shap_visuals(limits, dataframe, feat1_idx, feat2_idx, class_idx):

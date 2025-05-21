@@ -4,13 +4,16 @@ import plotly.figure_factory as ff
 import plotly.colors
 import numpy as np
 
+'''
+this file contains all methods needed to create the information component and its content
+'''
 
 
-def create_tabs_component(data_provider, data_provider_list):
+def create_information_component(data_provider, data_provider_list):
     tabs_creators = [
         lambda: create_chart_settings_tab(data_provider, data_provider_list),
         lambda: create_metrics_tab(data_provider.get_metrics_tab_data()),
-        lambda: create_decision_boundary_tab(data_provider.get_data_distribution(), data_provider.get_additional_boundary_info()),
+        lambda: create_decision_boundary_tab(data_provider.get_additional_boundary_info()),
         lambda: create_feature_information_tab(data_provider.get_class_names())
     ]
     return html.Div(
@@ -60,18 +63,6 @@ def create_chart_settings_tab(data_provider, data_provider_list):
 
     component = html.Div(style={'width': '98%', 'display': 'flex', 'flexDirection': 'column', 'flex': 1},
                          children=[
-                             #html.Div(style={'width': '100%', 'display': 'flex', 'flexDirection': 'column', 'flex': 1,
-                             #                'margin': '5px'},
-                             #         children=[
-                             #             html.Label('test'),
-                             #             html.Div([
-                             #                 html.Details([
-                             #                     html.Summary('What'),
-                             #                     html.Div('Is That')
-                             #                 ]) for x in range(4)])
-
-                             #         ]),
-
                              html.Div(style={'width': '100%', 'display': 'flex', 'flexDirection': 'column', 'flex': 1,
                                              'margin': '5px'},
                                       children=[
@@ -79,7 +70,7 @@ def create_chart_settings_tab(data_provider, data_provider_list):
                                           dcc.Checklist(
                                               id='charts-dimensions-selection',
                                               options=dimensions_selection_dropdown_options,
-                                              value=[f'{val[1]}' for val in dimension_combinations[:2]],
+                                              value=[f'{val[1]}' for val in dimension_combinations[:4]],
                                               style={
                                                   "border": "1px solid #ccc",
                                                   "padding": "10px",
@@ -148,7 +139,6 @@ def create_chart_settings_tab(data_provider, data_provider_list):
 
 def create_metrics_tab(metrics_data):
     metrics_data_df, complete_mat, sub_mat = metrics_data
-
     info_elements = []
 
     info_elements.append(html.Div(
@@ -159,22 +149,6 @@ def create_metrics_tab(metrics_data):
         [dcc.Graph(figure=sub_mat)],
         style={'border': '1px solid #ccc', 'padding': '3px', 'margin': '3px'}
     ))
-    #metrics_data_df = metrics_data_df.round(4)
-    #metrics_data_df = metrics_data_df.sort_values(by='metric')
-    #table_columns = [{'name': col, 'id': col} for col in metrics_data_df.columns]
-    #table_data = metrics_data_df.to_dict('records')
-    #datatable = dash_table.DataTable(
-    #    id='metrics-table',
-    #    columns=table_columns,
-    #    data=table_data,
-    #    style_table={'overflowX': 'auto'},
-    #    style_cell={'textAlign': 'center'},
-    #    style_header={
-    #        'fontWeight': 'bold',
-    #        'textAlign': 'center'
-    #    },
-    #)
-    #info_elements.append(datatable)
 
     scrollable_content = html.Div(
         info_elements,
@@ -188,37 +162,7 @@ def create_metrics_tab(metrics_data):
     return dcc.Tab(label='model evaluation metrics', children=scrollable_content, style={'backgroundColor': '#f0f0f0'})
 
 
-def create_decision_boundary_tab(data_dict, table_data):
-    if not isinstance(data_dict, dict) or not isinstance(table_data, list):
-        print("Error: create_tab2 requires a dictionary and a list of dictionaries as input.")
-        return None
-
-    if not isinstance(data_dict, dict):
-        print("Error: create_tab1 requires a dictionary as input.")
-        return None
-
-    info_elements = []
-    for outer_key, inner_dict in data_dict.items():
-
-        if not isinstance(inner_dict, dict):
-            print(f"Warning: Value for key '{outer_key}' is not a dictionary. Skipping.")
-            continue
-
-        inner_info_elements = []
-        for inner_key, inner_value in inner_dict.items():
-            inner_info_elements.append(html.Div(
-                [html.H6(inner_key), html.P(str(inner_value))],
-                style={'border': '1px solid #999', 'padding': '3px', 'margin': '3px', 'display': 'inline-block',
-                       'width': '100%'}
-            ))
-
-        info_elements.append(html.Div(
-            #[html.H5(outer_key), html.Div(inner_info_elements, style={'display': 'flex'})],
-            [html.H5(outer_key), html.Div(inner_info_elements, style={'display': 'flex'})],
-            style={'border': '1px solid #ccc', 'padding': '5px', 'margin': '5px'}
-        ))
-
-
+def create_decision_boundary_tab(table_data):
     if not table_data:
 
         datatable = html.P("No data to display in the table.")
@@ -240,7 +184,7 @@ def create_decision_boundary_tab(data_dict, table_data):
 
 def create_feature_information_tab(class_names):
     dropdown_options = [
-        {'label': 'feature distribution: training-data', 'value': '6'},
+        {'label': 'feature distribution: training-data', 'value': '1'},
         {'label': 'correlation matrix', 'value': '2'},
         *[{'label': f'shap summary chart ({name})', 'value': f'{index + 3}'} for index, name in enumerate(class_names)],
     ]
@@ -249,7 +193,7 @@ def create_feature_information_tab(class_names):
                             dcc.Dropdown(
                                 id='feature_info_dropdown',
                                 options=dropdown_options,
-                                value='6',
+                                value='1',
                                 style={'width': '100%'}
                             )],
         style={'border': '1px solid #999', 'padding': '3px', 'margin': '3px', 'display': 'inline-block',
@@ -265,32 +209,8 @@ def create_feature_information_tab(class_names):
                    style={'backgroundColor': '#e0e0e0'})
 
 
-
 def set_feature_information_tab_content(dropdown_value, data_provider):
-
-    if dropdown_value == '2':
-        corr_matrix_fig = data_provider.get_correlation_matrix()
-        return html.Div(children=[dcc.Graph(figure=corr_matrix_fig)])
-
-    if dropdown_value == '3':
-        shap_values = data_provider.shap_values
-        shap_fig_1 = create_shap_summary_plot_for_single_class(shap_values, data_provider.feature_names, 0, data_provider.train_data,
-                                                               data_provider.base_instance_id)
-        return html.Div(children=[html.P(''), dcc.Graph(figure=shap_fig_1)])
-
-    if dropdown_value == '4':
-        shap_values = data_provider.shap_values
-        shap_fig_2 = create_shap_summary_plot_for_single_class(shap_values, data_provider.feature_names, 1, data_provider.train_data,
-                                                               data_provider.base_instance_id)
-        return html.Div(children=[html.P(''), dcc.Graph(figure=shap_fig_2)])
-
-    if dropdown_value == '5':
-        shap_values = data_provider.shap_values
-        shap_fig_3 = create_shap_summary_plot_for_single_class(shap_values, data_provider.feature_names, 2, data_provider.train_data,
-                                                               data_provider.base_instance_id)
-        return html.Div(children=[html.P(''), dcc.Graph(figure=shap_fig_3)])
-
-    if dropdown_value == '6':
+    if dropdown_value == '1':
         figs = [create_kde(data_provider, x) for x in range(len(data_provider.base_instance))]
 
         charts = [dcc.Graph(figure=fig) for fig in figs]
@@ -304,12 +224,20 @@ def set_feature_information_tab_content(dropdown_value, data_provider):
         )
         return html.Div(children=[html.P(''), scrollable_content])
 
+    if dropdown_value == '2':
+        corr_matrix_fig = data_provider.get_correlation_matrix()
+        return html.Div(children=[dcc.Graph(figure=corr_matrix_fig)])
+
+    if int(dropdown_value) > 2:
+        class_idx = int(dropdown_value) - 3
+        shap_values = data_provider.shap_values
+        shap_fig = create_shap_summary_plot_for_single_class(shap_values, data_provider.feature_names, class_idx, data_provider.train_data, data_provider.base_instance_id)
+        return html.Div(children=[html.P(''), dcc.Graph(figure=shap_fig)])
+
 
 def create_kde(data_provider, index):
 
     feature_names = data_provider.feature_names
-
-
     train_data = data_provider.train_data
     data = train_data
     train_label = data_provider.y_train_data
@@ -424,26 +352,12 @@ def create_shap_summary_plot_for_single_class(shap_values, features, class_index
     for feature_idx in range(num_features):
         feature_name = features[feature_idx]
         feature_shap_vals = shap_values[:, feature_idx, class_index]
-        raw_values = np.array(instances)[:, feature_idx]
-
-        # Optional: Clip extremes to reduce outlier impact
-        clipped = np.clip(raw_values, np.percentile(raw_values, 1), np.percentile(raw_values, 99))
-
-        # Normalize to [0, 1]
-        min_val, max_val = np.min(clipped), np.max(clipped)
-        if min_val == max_val:
-            instance_values = np.full_like(clipped, 0.5)
-        else:
-            instance_values = (clipped- min_val) / (max_val - min_val)
-
-
 
         y_range = (-20, 20)
         if y_range is not None:
             ymin, ymax = y_range
             feature_shap_vals_normalized = (feature_shap_vals - np.min(feature_shap_vals)) / (np.max(feature_shap_vals) - np.min(feature_shap_vals))
             feature_shap_vals = ymin + feature_shap_vals_normalized * (ymax - ymin)
-
 
         feature_name = feature_name[:15] + "..." if len(feature_name) > 15 else feature_name
         fig.add_trace(go.Scatter(
@@ -455,16 +369,6 @@ def create_shap_summary_plot_for_single_class(shap_values, features, class_index
                 color='blue',
                 colorscale='Plasma',
                 showscale=False,
-                #colorbar=dict(
-                #    #title=f"Val (Class {class_index + 1})",
-                #    lenmode="fraction",
-                #    len=1.4,
-                #    orientation="h",
-                #    x=0.3,
-                #    y=-0.4,
-                #    yanchor="bottom",
-                #    xanchor="center"
-                #)
             ),
             name=f'Class {class_index + 1} - {feature_name}',
             orientation='v',
@@ -488,12 +392,10 @@ def create_shap_summary_plot_for_single_class(shap_values, features, class_index
             ))
 
     fig.update_layout(
-        #title=f"SHAP Summary Plot (Class {class_index + 1})",
         xaxis_title="SHAP Value",
         yaxis_title="Feature",
         height=550,
     )
 
     fig.update_layout(yaxis=dict(tickangle=-45))
-
     return fig

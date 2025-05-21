@@ -1,9 +1,10 @@
 from dash import dcc, html
-from dash_app.colors import Color
 from dataProvider import DataProvider
 
-
-def create_top_component(data_provider: DataProvider, data_provider_list):
+'''
+this file contains all methods to create the settings component
+'''
+def create_settings_component(data_provider: DataProvider, data_provider_list):
     calculated_instances_selection_options = [
         {
         'label': ' | '.join(f'{x:.2f}' for x in value.base_instance),
@@ -53,7 +54,6 @@ def create_top_component(data_provider: DataProvider, data_provider_list):
                                      style={'flex': '1', 'padding': '5px', 'border': '1px solid #ccc',
                                             'box-sizing': 'border-box', 'text-align': 'center'}),
 
-
                             html.Div([
                                 html.Label('saved instances'),
                                 dcc.Dropdown(
@@ -63,7 +63,6 @@ def create_top_component(data_provider: DataProvider, data_provider_list):
                                 )
                             ], style={'flex': '1', 'padding': '5px', 'border': '1px solid #ccc',
                                             'box-sizing': 'border-box', 'text-align': 'center'}),
-
 
                             html.Div(children=html.Div([
                                 html.Label('start calculation'),
@@ -79,13 +78,10 @@ def create_top_component(data_provider: DataProvider, data_provider_list):
                             ], style={'flex': '1', 'padding': '5px', 'border': '1px solid #ccc', 'background-color': data_provider.class_colors[i],
                                       'box-sizing': 'border-box', 'text-align': 'center',
                                       'display': 'flex', 'flex-direction': 'column'})]) for i, val in enumerate(probas)]
-                            #*[html.Div(children=f"Element {i+1}", style={'flex': '1', 'padding': '10px', 'border': '1px solid #ccc', 'box-sizing': 'border-box', 'text-align': 'center'}) for i in range(4)]
                         ]),
                         html.Div(style={'display': 'flex', 'justify-content': 'space-around', 'flex': 0.4}, children=[
-
                             html.Div([
                                 html.Label('apply changes'),
-
                                 html.Button(id='apply-changes-button', n_clicks=0, style={'height': '100%'}),
                             ], style={'display': 'flex', 'flex': '0.5', 'padding': '10px', 'border': '1px solid #ccc',
                                       'box-sizing': 'border-box', 'text-align': 'left', 'flexDirection': 'column'}),
@@ -100,7 +96,6 @@ def create_top_component(data_provider: DataProvider, data_provider_list):
                                 ], style={'display': 'flex', 'flex': '1', 'padding': '10px', 'border': '1px solid #ccc',
                                           'box-sizing': 'border-box', 'text-align': 'left', 'flexDirection': 'column'}) for index, name in enumerate(feature_names)
                             ],
-                                     # *[html.Div(children=f"Element {i+1}", style={'flex': '1', 'padding': '10px', 'border': '1px solid #ccc', 'box-sizing': 'border-box', 'text-align': 'center'}) for i in range(4)]
                         ]),
                     ]),
                 ])

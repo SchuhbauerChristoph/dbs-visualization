@@ -2,13 +2,17 @@ import dash
 from dash import html
 from dash.dependencies import Input, Output, State
 from dash_app.components.chart_grid_component import create_chart_grid_component, createAllCharts
-from dash_app.components.tab_component import create_tabs_component, set_feature_information_tab_content
+from dash_app.components.information_component import create_information_component, set_feature_information_tab_content
 from dash import no_update, dcc
-from dash_app.components.top_component import create_top_component
+from dash_app.components.settings_component import create_settings_component
 from dataProvider import DataProvider
 import plotly.graph_objects as go
 from typing import List
 import copy
+
+'''
+this file contains the base configuration of the app and all the callbacks
+'''
 
 data_provider = DataProvider()
 data_provider_list = [data_provider]
@@ -17,14 +21,6 @@ app = dash.Dash(__name__)
 
 app.layout = html.Div(
     children=[
-        html.Div(id='dummy-output', style={'display': 'none'}, children=[
-            dcc.Store(id='selected-instance', data=None),
-            dcc.Store(id='highlight_store', data=None),
-            dcc.Store(id='dataset_store', data=None),
-            html.Div(id='info_grid_container-6', children=[], style={'display': 'none'}),
-            html.Div(id='tabs-example', children=[], style={'display': 'none'})
-        ]),
-
         html.Div(id='hidden-div', style={'display': 'none'}),
         html.Div(
             style={
@@ -33,7 +29,7 @@ app.layout = html.Div(
                 'border': '1px solid black',
             },
             id='top-area',
-            children=create_top_component(data_provider, data_provider_list)
+            children=create_settings_component(data_provider, data_provider_list)
         ),
 
         html.Div(
@@ -53,7 +49,7 @@ app.layout = html.Div(
                                 'flex-direction': 'column'
                             },
                             id='chart-grid-area',
-                            children=create_chart_grid_component(data_provider, data_provider_list)
+                            children=create_chart_grid_component(data_provider_list)
                 ),
                 html.Div(
                             style={
@@ -64,7 +60,7 @@ app.layout = html.Div(
                                 'flex-direction': 'column'
                             },
                             id='tabs-area',
-                            children=create_tabs_component(data_provider, data_provider_list)
+                            children=create_information_component(data_provider, data_provider_list)
                 ),
             ]
         ),
@@ -110,23 +106,16 @@ def update_chart_grid(n_click, selected_values, heatmap_select, alt_figure_data=
         return [no_update for i in range(6)]
 
     if selected_values:
-        data_provider.setRequestedDims(selected_values)
+        data_provider.set_requested_dims(selected_values)
     else:
         return [no_update for i in range(6)]
 
     figure_data = data_provider.get_all_figure_data()
     if alt_figure_data is not None and len(alt_figure_data) != 0:
-        print(len(alt_figure_data))
         figure_data = alt_figure_data
     updated_charts, colors = createAllCharts(figure_data, heatmap_select=heatmap_select)
 
     return updated_charts
-
-
-
-
-
-
 
 
 @app.callback(
@@ -171,7 +160,7 @@ def combined_callback(
     if charts_data_provider_selection is not None and charts_dimensions_selection is not None:
         for selected_data_provider_index in charts_data_provider_selection:
             temp_data_provider: DataProvider = data_provider_list[selected_data_provider_index]
-            temp_data_provider.setRequestedDims(selected_tuples)
+            temp_data_provider.set_requested_dims(selected_tuples)
             providers_figure_data = temp_data_provider.get_all_figure_data()
             for fig_data in providers_figure_data:
                 needed_figure_data.append(fig_data)
@@ -187,21 +176,21 @@ def combined_callback(
         )
         return charts
 
-    if triggered_id.startswith('chart-'):
-        chart_index = int(triggered_id.split('-')[1]) - 1
-        return_values[:6] = handle_hover(chart_index)
+    #if triggered_id.startswith('chart-'):
+    #    chart_index = int(triggered_id.split('-')[1]) - 1
+    #    return_values[:6] = handle_hover(chart_index)
 
     if triggered_id == 'dataset-input':
         data_provider_list = []
-        data_provider.setRequestedDims(selected_tuples)
+        data_provider.set_requested_dims(selected_tuples)
         data_provider.change_dataset(dataset_input)
         data_provider_list.append(data_provider)
         updated_charts = update_chart_grid(update_charts_button_n_clicks, selected_tuples,
                                            charts_optional_element_selection, alt_figure_data=temp)
 
-        dropdown_component = create_tabs_component(data_provider, data_provider_list)
-        chart_grid_component = create_chart_grid_component(data_provider, data_provider_list)
-        top_component = create_top_component(data_provider, data_provider_list)
+        dropdown_component = create_information_component(data_provider, data_provider_list)
+        chart_grid_component = create_chart_grid_component(data_provider_list)
+        top_component = create_settings_component(data_provider, data_provider_list)
         return_values[:6] = updated_charts
         return_values[6] = top_component
         return_values[7] = chart_grid_component
@@ -209,26 +198,26 @@ def combined_callback(
 
     if triggered_id == 'saved-data-provider-selection':
         data_provider = copy.deepcopy(data_provider_list[saved_data_provider_selection])
-        dropdown_component = create_tabs_component(data_provider, data_provider_list)
-        chart_grid_component = create_chart_grid_component(data_provider, data_provider_list)
-        top_component = create_top_component(data_provider, data_provider_list)
+        dropdown_component = create_information_component(data_provider, data_provider_list)
+        chart_grid_component = create_chart_grid_component(data_provider_list)
+        top_component = create_settings_component(data_provider, data_provider_list)
 
         return_values[6] = top_component
         return_values[7] = chart_grid_component
         return_values[8] = dropdown_component
 
     if triggered_id == 'update-charts-button':
-        data_provider.setRequestedDims(selected_tuples)
+        data_provider.set_requested_dims(selected_tuples)
         updated_charts = update_chart_grid(update_charts_button_n_clicks, selected_tuples, charts_optional_element_selection, alt_figure_data=temp)
-        return_values[:6] = updated_charts
+        return_values[:6] = updated_charts if len(updated_charts) <= 6 else updated_charts[:6]
 
     if triggered_id == 'start-calculation-button':
 
         new_provider: DataProvider = copy.deepcopy(data_provider)
         new_provider.base_instance_id = base_instance_id_input_state
         new_provider.width = float(width_input_state)
-        new_provider.setRequestedDims(selected_tuples)
-        new_provider.redoCalculation(dataset_input)
+        new_provider.set_requested_dims(selected_tuples)
+        new_provider.redo_calculation(dataset_input)
         data_provider_list.append(new_provider)
         data_provider = new_provider
         data_provider.temp_feature_values =  [None for x in range(len(data_provider.base_instance))]
@@ -236,16 +225,16 @@ def combined_callback(
         updated_charts = update_chart_grid(update_charts_button_n_clicks, selected_tuples, charts_optional_element_selection, alt_figure_data=temp)
         return_values[:6] = updated_charts
 
-        dropdown_component = create_tabs_component(data_provider, data_provider_list)
-        chart_grid_component = create_chart_grid_component(data_provider, data_provider_list)
-        top_component = create_top_component(data_provider, data_provider_list)
+        dropdown_component = create_information_component(data_provider, data_provider_list)
+        chart_grid_component = create_chart_grid_component(data_provider_list)
+        top_component = create_settings_component(data_provider, data_provider_list)
 
         return_values[6] = top_component
         return_values[7] = chart_grid_component
         return_values[8] = dropdown_component
 
     if triggered_id == 'apply-changes-button':
-        print(feature_values)
+
         options = [{
             'label': ' | '.join(f'{x:.5f}' for x in value.base_instance),
             'value': index} for index, value in enumerate(data_provider_list)]

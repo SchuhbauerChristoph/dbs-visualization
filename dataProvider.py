@@ -1,4 +1,8 @@
 import itertools
+from copy import deepcopy
+
+import pdpbox.pdp
+
 from decision_boundaries_v2 import calculate_decision_boundaries, createGrid, load_dataset_from_updated_path, get_shap_values, \
     load_model_from_updated_path, model_wrapper
 import numpy as np
@@ -9,12 +13,16 @@ import plotly.graph_objects as go
 import matplotlib.colors as mcolors
 alpha = 0
 
-
+'''
+an entity of the data provider class contains all information related to a single instance. 
+a new data provider is created for each instance during the first time it is calculated
+the job of the data provider is to hold the information and provide it to the other components
+'''
 class DataProvider():
     def __init__(self):
 
-        self.data_set_name = 'fetal_health'
-        #self.data_set_name = 'iris'
+        #self.data_set_name = 'fetal_health'
+        self.data_set_name = 'iris'
         train_data, y_train_data, test_data, y_test_data, test_instances, test_label = load_dataset_from_updated_path(self.data_set_name)
         self.model = load_model_from_updated_path(self.data_set_name)
         self.base_instance_id: int = 4
@@ -23,12 +31,6 @@ class DataProvider():
         self.train_data = train_data
         self.y_train_data = y_train_data
         self.test_data = test_data
-        print(len(train_data))
-        print(len(y_train_data))
-        print(len(test_data))
-        print(len(y_test_data))
-        print(len(test_instances))
-        print(len(test_label))
         self.y_test_data = y_test_data
         self.test_instances = test_instances
         self.test_label = test_label
@@ -45,23 +47,19 @@ class DataProvider():
         self.fact_dict = None
         self.grid_points_dict = None
         self.grid_probs_dict = None
-
         self.grid_all_probs_dict = None
-
         self.requested_dims = list(itertools.combinations(list(range(len(self.base_instance))), 2))
         self.shap_values = None
-
         self.set_boundary_data()
         self.set_grid_data()
         self.set_shap_values()
-
         self.pdp_info_dict = self.calc_pdp_values()
         self.shap_df = self.get_shap_info()
-
         self.class_colors = self.set_class_colors()
 
     def change_dataset(self, dataset_name):
         self.data_set_name = dataset_name
+        self.class_colors = self.set_class_colors()
         train_data, y_train_data, test_data, y_test_data, test_instances, test_label = load_dataset_from_updated_path(self.data_set_name)
         self.model = load_model_from_updated_path(self.data_set_name)
         self.train_data = train_data
@@ -90,9 +88,7 @@ class DataProvider():
         self.set_shap_values()
         self.pdp_info_dict = self.calc_pdp_values()
         self.shap_df = self.get_shap_info()
-
         self.class_colors = self.set_class_colors()
-
 
     def set_boundary_data(self):
         [vis_instance, vis_inst_data, near_train_insts, boundaries, extra_data] = calculate_decision_boundaries(
@@ -104,8 +100,6 @@ class DataProvider():
             self.y_train_data,
             self.model,
             self.base_instance
-            # self.requested_dims  # can be None or not included to get all dimensions
-
         )
 
         self.upper_ends = vis_inst_data[0]
@@ -113,7 +107,6 @@ class DataProvider():
         self.near_instances = near_train_insts
         self.boundaries = boundaries
         self.fact_dict = extra_data
-
 
     def set_grid_data(self):
         varibleFeatures = list(itertools.combinations(list(range(len(self.base_instance))), 2))
@@ -132,12 +125,11 @@ class DataProvider():
         self.grid_probs_dict: dict = grid_probs_dict
         self.grid_all_probs_dict: dict = grid_all_probs_dict
 
-
     def set_shap_values(self):
         shap_values, expected_values = get_shap_values(self.train_data, self.y_train_data, self.test_data, self.y_test_data, self.model)
         self.shap_values = shap_values
 
-    def redoCalculation(self, dataset_name):
+    def redo_calculation(self, dataset_name):
         if dataset_name != self.data_set_name:
             self.change_dataset(dataset_name)
             return
@@ -148,26 +140,19 @@ class DataProvider():
 
         self.set_boundary_data()
         self.set_grid_data()
-
         self.pdp_info_dict = self.calc_pdp_values()
         self.shap_df = self.get_shap_info()
 
-
-
-    def setRequestedDims(self, selected_values):
+    def set_requested_dims(self, selected_values):
         if len(selected_values) == 0:
             self.requested_dims = list(itertools.combinations(list(range(len(self.base_instance))), 2))
         else:
             self.requested_dims = sorted(selected_values)
 
     def get_all_figure_data(self):
-        liste = []
+        figure_data_list = []
         dimension_combs = self.requested_dims
         near_instance_probs = model_wrapper(self.near_instances[0], self.model)
-        #near_instance_probs_res = np.argmax(near_instance_probs, axis=1)
-        print('data colors')
-        print(self.class_colors)
-
         for comp in dimension_combs:
             figure_data = {
                 'dims': str(comp),
@@ -187,11 +172,11 @@ class DataProvider():
                 'shap_df': self.shap_df,
                 'class_colors': self.class_colors
             }
-            liste.append(figure_data)
-        if len(liste) < 7:
-            return liste
+            figure_data_list.append(figure_data)
+        if len(figure_data_list) < 7:
+            return figure_data_list
         else:
-            return liste[:6]
+            return figure_data_list[:6]
 
 
     def get_class_names(self):
@@ -204,12 +189,10 @@ class DataProvider():
         high_color = 'yellow'
         number_of_classes = 3 if self.data_set_name == 'iris' else 2
 
-
         cmap = mcolors.LinearSegmentedColormap.from_list('custom_cmap', [low_color, high_color], N=number_of_classes)
         colors = [cmap(i/number_of_classes) for i in range(number_of_classes)]
         hex_colors = [f"#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}" for r, g, b, a in colors]
         return hex_colors
-
 
     def set_feature_names(self):
         if self.data_set_name == 'iris':
@@ -222,7 +205,7 @@ class DataProvider():
         else:
             feature_names = [
                 'baseline value',
-                'accelerations,',
+                'accelerations',
                 'fetal_movement',
                 'uterine_contractions',
                 'prolongued_decelerations',
@@ -255,53 +238,15 @@ class DataProvider():
         probabilities = np.exp(all_logits) / np.sum(np.exp(all_logits), axis=1, keepdims=True)
         return probabilities
 
-    def get_data_distribution(self):
-        smallest_dist = float('inf')
-        biggest_dist = float(-1)
-        distance_sum = 0
-
-        for k, v in self.fact_dict.items():
-            dist = v.iloc[-1, 0]
-            if dist is None:
-                continue
-            distance_sum = distance_sum + dist
-            if dist < smallest_dist:
-                smallest_dist = dist
-
-            if dist > biggest_dist:
-                biggest_dist = dist
-
-        pred = self.model.propagate([self.base_instance])
-        all_logits = np.array(pred)
-
-        probabilities = np.exp(all_logits) / np.sum(np.exp(all_logits), axis=1, keepdims=True)
-
-        class_names = self.get_class_names()
-        #met1 = self.run_metric1()
-        #instance_distri = met1[0][0]
-        #val_dict = {class_names[i]: instance_distri[i] for i, val in enumerate(instance_distri) }
-        val_dict = {'class_names[i]': 'instance_distri[i]' for i in range(3) }
-        print(val_dict)
-
-        data_dict = {
-            'distribution of classes in the instance neighbourhood': val_dict,
-        }
-        return data_dict
-
     def get_additional_boundary_info(self):
         temp = []
         for k, v in self.fact_dict.items():
             v = v.round(6)
 
-
             def truncate_text(text, length=13):
                 return text[:length] + "..." if len(text) > length else text
 
-
-            #dims_name = f'{self.feature_names[k[0]]}/{self.feature_names[k[1]]}'
             dims_name = f'{truncate_text(self.feature_names[k[0]])}/{truncate_text(self.feature_names[k[1]])}'
-
-            #dims_name = truncate_text(dims_name)
             t = {'dimensions': f'{dims_name}', 'overall distance': v.iloc[3,0], 'nearest DB point': f'{v.iloc[1,0]} / {v.iloc[1,1]}'}
             temp.append(t)
         return temp
@@ -313,17 +258,6 @@ class DataProvider():
         vals = list(itertools.combinations(list(range(len(self.base_instance))), 2))
         labels = [f'{self.feature_names[x]} | {self.feature_names[y]}' for [x, y] in vals]
         return zip(labels, vals)
-
-    def run_metric1(self):
-        from metrics import met1
-        res = met1(
-            test_instances=self.test_instances[self.base_instance_id:self.base_instance_id + 1],
-            test_labels=self.test_label[self.base_instance_id:self.base_instance_id + 1],
-            width=self.width,
-            model=self.model,
-            pred_triv=True
-        )
-        return res
 
     def get_metrics_tab_data(self):
         instances = self.test_instances
@@ -349,71 +283,6 @@ class DataProvider():
             true = int(true)
             complete_conf_matrix[true, pred] += 1
 
-        '''
-        complete_tp = np.diag(complete_conf_matrix)
-        complete_fp = np.sum(complete_conf_matrix, axis=0) - complete_tp
-        complete_fn = np.sum(complete_conf_matrix, axis=1) - complete_tp
-        complete_precision = np.nan_to_num(complete_tp / (complete_tp + complete_fp), nan=0.0)
-        complete_recall = np.nan_to_num(complete_tp / (complete_tp + complete_fn), nan=0.0)
-        complete_f1 = np.nan_to_num(2 * complete_precision * complete_recall / (complete_precision + complete_recall),
-                                    nan=0.0)
-        complete_accuracy = np.sum(complete_tp) / np.sum(complete_conf_matrix)
-
-        subset_tp = np.diag(subset_conf_matrix)
-        subset_fp = np.sum(subset_conf_matrix, axis=0) - subset_tp
-        subset_fn = np.sum(subset_conf_matrix, axis=1) - subset_tp
-        subset_precision = np.nan_to_num(subset_tp / (subset_tp + subset_fp), nan=0.0)
-        subset_recall = np.nan_to_num(subset_tp / (subset_tp + subset_fn), nan=0.0)
-        subset_f1 = np.nan_to_num(2 * subset_precision * subset_recall / (subset_precision + subset_recall), nan=0.0)
-        subset_accuracy = np.sum(subset_tp) / np.sum(subset_conf_matrix)
-        rows = []
-        class_names = self.get_class_names()
-        metrics = ['accuracy', 'precision', 'recall', 'f1']
-        for metric in metrics:
-            rows.append({
-                'metric': metric,
-                'subset': 'komplett',
-                'overall': (
-                    complete_accuracy if metric == 'accuracy' else
-                    complete_precision.mean() if metric == 'precision' else
-                    complete_recall.mean() if metric == 'recall' else
-                    complete_f1.mean()
-                ),
-                **{
-                    f'class_{cls}': (
-                        None if metric == 'accuracy' else
-                        complete_precision[cls] if metric == 'precision' else
-                        complete_recall[cls] if metric == 'recall' else
-                        complete_f1[cls]
-                    )
-                    for cls in range(n_classes)
-                }
-            })
-            rows.append({
-                'metric': metric,
-                'subset': 'Subset',
-                'overall': (
-                    subset_accuracy if metric == 'accuracy' else
-                    subset_precision.mean() if metric == 'precision' else
-                    subset_recall.mean() if metric == 'recall' else
-                    subset_f1.mean()
-                ),
-                **{
-                    f'class_{cls}': (
-                        None if metric == 'accuracy' else
-                        subset_precision[cls] if metric == 'precision' else
-                        subset_recall[cls] if metric == 'recall' else
-                        subset_f1[cls]
-                    )
-                    for cls in range(n_classes)
-                }
-            })
-
-        metrics_df = pd.DataFrame(rows)
-        metrics_df = metrics_df.rename(columns={
-            'class_0':'setosa', 'class_1':'versicolor', 'class_2':'virginica', 'subset': 'Testinstanzen', 'overall': 'Durchschnitt'
-        })
-        '''
         class_names = self.get_class_names()
         def create_conf_matrix_heatmap(matrix, title):
             fig = go.Figure(
@@ -448,7 +317,7 @@ class DataProvider():
 
     def calc_pdp_values(self):
         train = self.train_data
-        column_names = [f'feature{i + 1}' for i in range(train.shape[1])]
+        column_names = self.feature_names
         df = pd.DataFrame(train, columns=column_names)
 
         from itertools import permutations
@@ -493,7 +362,27 @@ class DataProvider():
                 feature_names=features,
                 n_classes=len(self.get_class_names())
             )
+
+            # ---------------------------------------------------------------------
+            # add the missing “negative” curve for binary models
+            # PDPbox docs: for binary tasks `pdp_interact.results` contains ONE PDPResult
+            # (the positive‐class curve).
+            # ---------------------------------------------------------------------
+            if (
+                    len(self.get_class_names()) == 2
+                    and len(pdp_interact.results) == 1
+            ):
+                pos_res = pdp_interact.results[0]
+                neg_res = deepcopy(pos_res)
+
+                neg_res.pdp = 1.0 - pos_res.pdp
+                neg_res.class_id = self.get_class_names()[0]
+                pos_res.class_id = self.get_class_names()[1]
+
+                pdp_interact.results = [neg_res, pos_res]
+                pdp_interact.n_classes = 2
             results_dict[(feat1, feat2)] = pdp_interact
+
         return results_dict
 
     def get_shap_info(self):
