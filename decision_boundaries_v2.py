@@ -615,20 +615,15 @@ class DecisionBoundaries():
                 #plt.savefig(f"results/{PLATZHALTER}/figures/exact_decision_boundaries_{PLATZHALTER}_{len(uncer_idx)}dim_{date.today()}.png", dpi = 400)
 
 
-         
-
 def model_wrapper(X, myModel: LinearSegmentsTest_v3.Model):
     predictions = myModel.propagate(X)
     return np.array(predictions)
-
-
 
 
 def load_model_from_updated_path(dataset_name):
     current_dir = os.path.dirname(os.path.abspath(__file__))
     the_model = loadModel(f"{current_dir}/datasets/{dataset_name}/model_{dataset_name}.pt", alpha=alpha)
     return the_model
-
 
 
 def load_dataset_from_updated_path(dataset_name='iris'):
@@ -652,43 +647,15 @@ def load_dataset_from_updated_path(dataset_name='iris'):
     test_instances = test_data[:]
     test_label = y_test_data[:]
 
-    print(iris_data)
-    print(iris_data.shape)
-    print(iris_data[0])
-    print(iris_labels[0])
-    print(iris_data[3])
-    print(iris_labels[3])
-    print(iris_data[5])
-    print(iris_labels[5])
-
-
-    # metric 1 for test data: Metric 1 computes the relative amounts of volume of the
-    # class subspaces in the cube (of size width) around the instances to be analyzed
-    # In the met1 function the calculation of the DBs is included.
-    # Together with other information, the volumes and the softmax values of the instances
-    # are returned. More details are explained in metrics.py.
-    #results = {}
-    #test_met1 = met1(test_instances=test_instances, test_labels=test_label, width=0.2,
-    #                 model=model, pred_triv=True)
-    #test_met1_sums = [met1_res.sum() for met1_res in test_met1[0]]
-    #print("Test Metric 1 sums: ", test_met1_sums)
-    #results['Metric 1 Test Data'] = test_met1[0]
-    #results['Softmax Test Data'] = test_met1[7]
-
-    #metric_results, all_inst_dbs, gen_list, time_dicts, time_dict, trivial_predictions, model_predictions, softmax_vals = met1(test_instances=test_instances, test_labels=test_label, width=0.2,
-    #                 model=model, pred_triv=True)
-
     return train_data, y_train_data, test_data, y_test_data, test_instances, test_label
 
 
 def get_shap_values(train_data, y_train_data, test_data, y_test_data, loaded_model, test_instances= None):
 
     train_instances = np.array(train_data[:])
-    train_label = np.array(y_train_data[:])
 
     if test_instances is None:
         test_instances = np.array(test_data[:])
-    test_label = np.array(y_test_data[:])
 
     K = min(10, len(train_instances))
     sampled_train_instances = shap.sample(train_instances, K)
@@ -697,8 +664,6 @@ def get_shap_values(train_data, y_train_data, test_data, y_test_data, loaded_mod
     shap_values = explainer.shap_values(test_instances)
 
     return shap_values, explainer.expected_value
-
-
 
 
 def calculate_decision_boundaries(inst_id, width, test_instances, test_label, train_data, y_train_data, current_model, changed_instance=None, requested_dims=None):
@@ -759,7 +724,6 @@ def calculate_decision_boundaries(inst_id, width, test_instances, test_label, tr
             df = pd.DataFrame()
             df['Instance'] = res_vis_inst
             df['Nearest DB point'] = None
-            #db_dir = nearest_db_pt - res_vis_inst
             df['Direction to nearest DB'] = None
             df['overall distance'] = None
 
@@ -768,300 +732,6 @@ def calculate_decision_boundaries(inst_id, width, test_instances, test_label, tr
         tempBorders[tuple(vis_dims)] = vis_dbs.exact_decision_boundaries
 
     return [vis_instance, vis_inst_data, near_train_insts, tempBorders, dataframe_dict]
-
-
-
-
-'''
-def calculate_decision_boundaries2(cur_inst_id, cur_width, test_instances, test_label, train_data, y_train_data,
-                                  current_model, changed_instance=None, requested_dims=None, change_feature_idx=None,
-                                  changed_feature_value=None, ):
-    start = time.time()
-    # print('calc boundaries')
-    # Runs a few exemplary calculations and visualizations for the specified instance (Instance 10 here)
-
-    inst_id = cur_inst_id
-    vis_instance = test_instances[inst_id]
-    # vis_instance = [0.61111111, 0.5,        0.69491525, 0.49166667]
-    vis_label = test_label[inst_id]
-    width = cur_width
-
-    # vis_dims = [1, 2, 3, 0]  # Dimensions to be analyzed
-    # vis_dims = [0,1,2,4,5]
-    vis_dims = [i for i in range(len(vis_instance))]
-    if requested_dims is not None:
-        vis_dims = requested_dims
-
-    # print(f'width: {width} - test_instances[0]: {test_instances[0]}')
-    # print(f'np arry: {[width]}')
-    width_vec = np.array([width] * len(test_instances[0]))
-    res_vis_inst = np.array(vis_instance)[vis_dims]
-
-    # set whole cert_vec = None only if all dimensions are analyzed
-    # use the definition above for subspaces
-    cert_vec = None
-    # cert_vec = [None if i in vis_dims else val for i, val in enumerate(vis_instance)]
-    if requested_dims is not None:
-        cert_vec = [None if i in vis_dims else val for i, val in enumerate(vis_instance)]
-    # cert_vec = [None if i in vis_dims else val for i, val in enumerate(vis_instance)]
-    max_cube_data = vis_instance + np.array(width_vec) / 2
-    min_cube_data = vis_instance - np.array(width_vec) / 2
-    vis_inst_data = np.array([max_cube_data, min_cube_data])
-    # print(vis_dims)
-    # print(cert_vec)
-
-    # Initialize the DecisionBoundaries Object
-    print('initialize with this:')
-    #print(vis_inst_data)
-    print(vis_inst_data, vis_label, cert_vec)
-    print('#################')
-    vis_dbs = DecisionBoundaries(model=current_model, data=vis_inst_data, labels=vis_label)
-    print("Start Linear Regions")
-    # vis_dbs.getLinearRegions(certainty_vector = cert_vec, version = 3)
-    vis_dbs.getLinearRegions(certainty_vector=cert_vec)
-    print("Start Decision Boundaries")
-    vis_dbs.getDecisionBoundariesExact(certainty_vector=cert_vec)
-    print('exact bonds')
-    print(vis_dbs.exact_decision_boundaries)
-
-
-
-    if cert_vec is None:
-        distances = vis_dbs.getDistancestoallBoundariesOpt(vis_instance)
-    else:
-        distances = vis_dbs.getDistancestoallBoundariesOpt(res_vis_inst)
-
-    if len(distances[0]) > 0:
-        arg_min = np.argmin(distances[0])
-        min_dist = distances[0][arg_min]
-        nearest_db_pt = distances[1][arg_min]
-
-        df = pd.DataFrame()
-        df['Instance'] = res_vis_inst
-        df['Nearest DB point'] = nearest_db_pt
-        db_dir = nearest_db_pt - res_vis_inst
-        df['Direction to nearest DB'] = db_dir
-        df['overall distance'] = min_dist
-        df = df.transpose()
-        print(df)
-
-    # df.to_excel(f'results/{PLATZHALTER}/min_distances_and_nearest_db_pt_test_instance_{inst_id}.xlsx')
-    # print("Min distance to DB: ", min_dist)
-    # print("Nearest DB point: ", nearest_db_pt)
-    # print("Direction to DB: ", db_dir)
-    # print("Normed Direction to DB: ", db_dir / np.linalg.norm(db_dir))
-
-    # Visualize an the area around an instance in two dimensions
-    # using the plot functions above. All possible two dimensional subspaces
-    # are visualiszed using the respective certainty vector (cert_vec) below.
-    # change_idx = 2
-    # change_factor = 1.06
-    vis_instance = test_instances[inst_id]
-    if change_feature_idx is not None:
-        vis_instance[change_feature_idx] = vis_instance[change_feature_idx] * changed_feature_value
-    # vis_instance = [0.61111111, 0.5,        0.69491525, 0.49166667]
-
-    if changed_instance is not None:
-        vis_instance = changed_instance
-
-    near_train_insts = near_train_instances(train_data, y_train_data, [vis_instance], radius=width_vec / 2)
-
-    idcs = list(range(len(vis_instance)))
-    all_vis_dims = list(combinations(idcs, 2))
-    mid_1 = time.time()
-
-    tempBorders = {}
-    dataframe_dict = {}
-    temp = 1
-    for vis_dims in all_vis_dims:
-        vis_dims = list(vis_dims)
-        # print('loop with')
-        # print(vis_dims)
-        # print(vis_instance)
-
-        res_vis_inst = np.array(vis_instance)[vis_dims]
-        cert_vec = [None if i in vis_dims else val for i, val in enumerate(vis_instance)]
-        # if cert_vec[3] is not None:
-        #    cert_vec[3] = cert_vec[3] * 1.5
-        max_cube_data = vis_instance + np.array(width) / 2
-        min_cube_data = vis_instance - np.array(width) / 2
-        vis_inst_data = np.array([max_cube_data, min_cube_data])
-        vis_label = test_label[inst_id]
-
-        # print('here')
-        # print(vis_inst_data)
-        # print(cert_vec)
-        # if cert_vec[2] != None:
-        #    cert_vec[2] = 0.64400
-        # if cert_vec[3] != None:
-        #    cert_vec[3] = 0.74400
-        # cert_vec[3] = 0.59166
-        # print(cert_vec)
-        # print('#############')
-        vis_dbs = DecisionBoundaries(model=current_model, data=vis_inst_data, labels=vis_label)
-        vis_dbs.getLinearRegions(certainty_vector=cert_vec, version=3)
-        vis_dbs.getDecisionBoundariesExact(certainty_vector=cert_vec)
-
-
-        vis_dbs = DecisionBoundaries(model=current_model, data=vis_inst_data, labels=vis_label)
-        print("Start Linear Regions")
-        # vis_dbs.getLinearRegions(certainty_vector = cert_vec, version = 3)
-        vis_dbs.getLinearRegions(certainty_vector=cert_vec)
-        print("Start Decision Boundaries")
-        vis_dbs.getDecisionBoundariesExact(certainty_vector=cert_vec)
-
-
-        if cert_vec is None:
-            distances = vis_dbs.getDistancestoallBoundariesOpt(vis_instance)
-        else:
-            distances = vis_dbs.getDistancestoallBoundariesOpt(res_vis_inst)
-
-        if len(distances[0]) > 0:
-            arg_min = np.argmin(distances[0])
-            min_dist = distances[0][arg_min]
-            nearest_db_pt = distances[1][arg_min]
-
-            df = pd.DataFrame()
-            df['Instance'] = res_vis_inst
-            df['Nearest DB point'] = nearest_db_pt
-            db_dir = nearest_db_pt - res_vis_inst
-            df['Direction to nearest DB'] = db_dir
-            df['overall distance'] = min_dist
-
-            df = df.transpose()
-        else:
-            df = pd.DataFrame()
-            df['Instance'] = res_vis_inst
-            df['Nearest DB point'] = None
-            # db_dir = nearest_db_pt - res_vis_inst
-            df['Direction to nearest DB'] = None
-            df['overall distance'] = None
-
-            df = df.transpose()
-        dataframe_dict[tuple(vis_dims)] = df
-        # print(vis_dims)
-        # print(df)
-        # df.to_excel(f'results/{PLATZHALTER}/min_distances_and_nearest_db_pt_test_instance_{inst_id}.xlsx')
-        # print("Min distance to DB: ", min_dist)
-        # print("Nearest DB point: ", nearest_db_pt)
-        # print("Direction to DB: ", db_dir)
-        # print("Normed Direction to DB: ", db_dir / np.linalg.norm(db_dir))
-
-        # print('res_vis_inst')
-        # print(res_vis_inst)
-        tempBorders[tuple(vis_dims)] = vis_dbs.exact_decision_boundaries
-
-        # tempBorders.append(vis_dbs.exact_decision_boundaries)
-        # distances = vis_dbs.getDistancestoallBoundariesOpt(res_vis_inst)
-        # print("Minimum Distance to a DB in the Subspace: ", np.min(distances[0]))
-
-        # vis_dbs.plotExactDecisionBoundaries(x=res_vis_inst, train_inst=near_train_insts, linear_regions=False,
-        #                                    certainty_vector=cert_vec,
-        #                                    color=False, color_spaces=True, save_png=True, scale=False)
-
-    return [vis_instance, vis_inst_data, near_train_insts, tempBorders, dataframe_dict]
-
-
-
-def calc_boundaries_2(current_model, test_instances, train_data, y_train_data, cur_width, vis_instance, vis_label):
-    start = time.time()
-    # print('calc boundaries')
-    # Runs a few exemplary calculations and visualizations for the specified instance (Instance 10 here)
-
-    #inst_id = cur_inst_id
-    #vis_instance = test_instances[inst_id]
-    # vis_instance = [0.61111111, 0.5,        0.69491525, 0.49166667]
-    #vis_label = test_label[inst_id]
-    width = cur_width
-
-    # vis_dims = [1, 2, 3, 0]  # Dimensions to be analyzed
-    # vis_dims = [0,1,2,4,5]
-    #vis_dims = [i for i in range(len(vis_instance))]
-    #if requested_dims is not None:
-    #    vis_dims = requested_dims
-
-    width_vec = np.array([width] * len(test_instances[0]))
-    #res_vis_inst = np.array(vis_instance)[vis_dims]
-
-    # set whole cert_vec = None only if all dimensions are analyzed
-    # use the definition above for subspaces
-    #cert_vec = None
-    # cert_vec = [None if i in vis_dims else val for i, val in enumerate(vis_instance)]
-    #if requested_dims is not None:
-    #    cert_vec = [None if i in vis_dims else val for i, val in enumerate(vis_instance)]
-    # cert_vec = [None if i in vis_dims else val for i, val in enumerate(vis_instance)]
-    max_cube_data = vis_instance + np.array(width_vec) / 2
-    min_cube_data = vis_instance - np.array(width_vec) / 2
-    vis_inst_data = np.array([max_cube_data, min_cube_data])
-
-
-
-
-    #vis_instance = test_instances[inst_id]
-    #if change_feature_idx is not None:
-    #    vis_instance[change_feature_idx] = vis_instance[change_feature_idx] * changed_feature_value
-
-    #if changed_instance is not None:
-    #    vis_instance = changed_instance
-
-    near_train_insts = near_train_instances(train_data, y_train_data, [vis_instance], radius=width_vec / 2)
-
-
-    idcs = list(range(len(vis_instance)))
-    all_vis_dims = list(combinations(idcs, 2))
-
-    tempBorders = {}
-    dataframe_dict = {}
-    for vis_dims in all_vis_dims:
-        vis_dims = list(vis_dims)
-
-        res_vis_inst = np.array(vis_instance)[vis_dims]
-        cert_vec = [None if i in vis_dims else val for i, val in enumerate(vis_instance)]
-
-        max_cube_data = vis_instance + np.array(width) / 2
-        min_cube_data = vis_instance - np.array(width) / 2
-        vis_inst_data = np.array([max_cube_data, min_cube_data])
-        #vis_label = test_label[inst_id]
-
-        vis_dbs = DecisionBoundaries(model=current_model, data=vis_inst_data, labels=vis_label)
-        vis_dbs.getLinearRegions(certainty_vector=cert_vec, version=3)
-        vis_dbs.getDecisionBoundariesExact(certainty_vector=cert_vec)
-
-
-
-        if cert_vec is None:
-            distances = vis_dbs.getDistancestoallBoundariesOpt(vis_instance)
-        else:
-            distances = vis_dbs.getDistancestoallBoundariesOpt(res_vis_inst)
-
-        if len(distances[0]) > 0:
-            arg_min = np.argmin(distances[0])
-            min_dist = distances[0][arg_min]
-            nearest_db_pt = distances[1][arg_min]
-
-            df = pd.DataFrame()
-            df['Instance'] = res_vis_inst
-            df['Nearest DB point'] = nearest_db_pt
-            db_dir = nearest_db_pt - res_vis_inst
-            df['Direction to nearest DB'] = db_dir
-            df['overall distance'] = min_dist
-
-            df = df.transpose()
-        else:
-            df = pd.DataFrame()
-            df['Instance'] = res_vis_inst
-            df['Nearest DB point'] = None
-            # db_dir = nearest_db_pt - res_vis_inst
-            df['Direction to nearest DB'] = None
-            df['overall distance'] = None
-
-            df = df.transpose()
-        dataframe_dict[tuple(vis_dims)] = df
-        tempBorders[tuple(vis_dims)] = vis_dbs.exact_decision_boundaries
-
-    return [vis_instance, vis_inst_data, near_train_insts, tempBorders, dataframe_dict]
-
-'''
 
 
 def createGrid(instance, varibleFeatures, lowerEnds, upperEnds, stepSize, loaded_model):
