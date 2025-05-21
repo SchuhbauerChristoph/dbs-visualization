@@ -1,14 +1,16 @@
 from dash import dcc, html
+from dash_app.colors import Color
+from dataProvider import DataProvider
 
 
-def create_top_component(data_provider, data_provider_list):
+def create_top_component(data_provider: DataProvider, data_provider_list):
     calculated_instances_selection_options = [
         {
         'label': ' | '.join(f'{x:.2f}' for x in value.base_instance),
         'value': index
         } for index, value in enumerate(data_provider_list)
     ]
-    test_instances_selection_options = [{'label': i, 'value': i} for i in range(len(data_provider.test_instances))]
+    test_instances_selection_options = [{'label': f'instance nr. {i}', 'value': i} for i in range(len(data_provider.test_instances))]
     class_names = data_provider.get_class_names()
     probas = data_provider.get_prediction()[0]
     feature_names = data_provider.feature_names
@@ -74,7 +76,7 @@ def create_top_component(data_provider, data_provider_list):
                                 html.Label(f'prediction for: {class_names[i]}'),
                                 html.Label(f'{val:.4f}', style={'height': '35px', 'paddingTop': '15px'}),
 
-                            ], style={'flex': '1', 'padding': '5px', 'border': '1px solid #ccc',
+                            ], style={'flex': '1', 'padding': '5px', 'border': '1px solid #ccc', 'background-color': data_provider.class_colors[i],
                                       'box-sizing': 'border-box', 'text-align': 'center',
                                       'display': 'flex', 'flex-direction': 'column'})]) for i, val in enumerate(probas)]
                             #*[html.Div(children=f"Element {i+1}", style={'flex': '1', 'padding': '10px', 'border': '1px solid #ccc', 'box-sizing': 'border-box', 'text-align': 'center'}) for i in range(4)]

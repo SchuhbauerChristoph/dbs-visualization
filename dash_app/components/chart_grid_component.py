@@ -1,9 +1,10 @@
 import numpy as np
 import plotly.graph_objects as go
 from dash import dcc, html
+from dash_app.colors import Color
+from dataProvider import DataProvider
 
-
-def create_chart_grid_component(data_provider, data_provider_list=None):
+def create_chart_grid_component(data_provider: DataProvider, data_provider_list=None):
 
     llll = []
     dims_idx = 0
@@ -74,6 +75,9 @@ def createFig(figure_data: dict, highlight_instance=None, heatmap_select='z1'):
     prediction_near_instances = np.argmax(raw_prediction_near_instances, axis=1)
     points = figure_data['points']
     all_probs = figure_data['all_probs']
+    class_colors = figure_data['class_colors']
+    print('class_colors')
+    print(class_colors)
 
     feat_name_x, feat_name_y = figure_data['feature_names']
 
@@ -85,7 +89,7 @@ def createFig(figure_data: dict, highlight_instance=None, heatmap_select='z1'):
 
 
     # set create standart heatmap
-    heat_map: go.Heatmap = create_class_area_heatmap(points, all_probs, relevant_features)
+    heat_map: go.Heatmap = create_class_area_heatmap(points, all_probs, relevant_features, class_colors, len(class_colors))
 
     if heatmap_select.startswith('z2_'):
         index = heatmap_select.split('_')[1]
@@ -105,8 +109,13 @@ def createFig(figure_data: dict, highlight_instance=None, heatmap_select='z1'):
 
     labels = instances_to_add[1]
     instance_label = figure_data['instance_label']
-    colors = ['blue' if label == 1 else 'yellow' if label == 2 else 'black' if label == 3 else 'purple' for label in labels]
-    nears_prediction_colors = ['blue' if pred == 1 else 'yellow' if pred == 2 else 'black' if pred == 3 else 'purple' for pred in prediction_near_instances]
+    #colors = ['blue' if label == 1 else 'yellow' if label == 2 else 'black' if label == 3 else 'purple' for label in labels]
+    #colors = [getattr(Color, f"CLASS_{label}_PRIMARY_COLOR").value for label in labels]
+    print('labels')
+    print(labels)
+    colors = [class_colors[int(label)] for label in labels]
+    #nears_prediction_colors = ['blue' if pred == 1 else 'yellow' if pred == 2 else 'black' if pred == 3 else 'purple' for pred in prediction_near_instances]
+    nears_prediction_colors = [class_colors[pred] for pred in prediction_near_instances]
 
     if heatmap_select.startswith('z5_'):
         index = heatmap_select.split('_')[1]
@@ -119,7 +128,8 @@ def createFig(figure_data: dict, highlight_instance=None, heatmap_select='z1'):
         colors = [value for value in normalized_values]
         nears_prediction_colors = colors
 
-    instance_color = ['blue' if instance_label == 1 else 'yellow' if instance_label == 2 else 'black' if instance_label == 3 else 'purple']
+    #instance_color = ['blue' if instance_label == 1 else 'yellow' if instance_label == 2 else 'black' if instance_label == 3 else 'purple']
+    instance_color = [class_colors[int(instance_label)]]
     if highlight_instance is not None:
         index = None
         for i, instance_ in enumerate(instances_to_add[0]):
@@ -168,6 +178,9 @@ def createFig(figure_data: dict, highlight_instance=None, heatmap_select='z1'):
 
 
 def create_pdp_heatmap_by_class(pdp_interact, class_idx, limits):
+    print(pdp_interact.results)
+    print('class_idx pdp')
+    print(class_idx)
     pdp_results = pdp_interact.results[class_idx]
     feat1_name, feat2_name = pdp_interact.feature_names
     feat1_values = [combo[0] for combo in pdp_interact.feature_grid_combos]
@@ -228,7 +241,7 @@ def create_probability_heatmap_by_class(grid_points, values, relevant_features, 
     )
 
 
-def create_class_area_heatmap(grid_points, all_probs, relevant_features):
+def create_class_area_heatmap(grid_points, all_probs, relevant_features, colors, n_classes: int):
 
     x_feature, y_feature = relevant_features
     x_values = [point[x_feature] for point in grid_points]
@@ -250,9 +263,9 @@ def create_class_area_heatmap(grid_points, all_probs, relevant_features):
         z=grid_z,
         x=xi,
         y=yi,
-        zmax=2,
+        zmax=n_classes - 1,
         zmin=0,
-        colorscale='Viridis',
+        colorscale=colors,
         showscale=True,
         opacity=0.4
     )
@@ -298,7 +311,7 @@ def create_scatter_trace(instances, relevant_features, label_color, prediction_c
                 marker=dict(
                     color=label_color,
                     symbol=_symbol,
-                    size=10,
+                    size=15,
                     line=dict(
                         color='white',
                         width=1
@@ -315,7 +328,7 @@ def create_scatter_trace(instances, relevant_features, label_color, prediction_c
             marker=dict(
                 color=label_color,
                 symbol=_symbol,
-                size=8,
+                size=10,
                 line=dict(
                     color=prediction_colors,
                     width=2

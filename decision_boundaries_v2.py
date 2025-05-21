@@ -652,6 +652,15 @@ def load_dataset_from_updated_path(dataset_name='iris'):
     test_instances = test_data[:]
     test_label = y_test_data[:]
 
+    print(iris_data)
+    print(iris_data.shape)
+    print(iris_data[0])
+    print(iris_labels[0])
+    print(iris_data[3])
+    print(iris_labels[3])
+    print(iris_data[5])
+    print(iris_labels[5])
+
 
     # metric 1 for test data: Metric 1 computes the relative amounts of volume of the
     # class subspaces in the cube (of size width) around the instances to be analyzed

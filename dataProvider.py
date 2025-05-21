@@ -6,22 +6,29 @@ from typing import List
 import pandas as pd
 from pdpbox import pdp
 import plotly.graph_objects as go
+import matplotlib.colors as mcolors
 alpha = 0
 
 
 class DataProvider():
     def __init__(self):
 
-        #self.data_set_name = 'fetal_health'
-        self.data_set_name = 'iris'
+        self.data_set_name = 'fetal_health'
+        #self.data_set_name = 'iris'
         train_data, y_train_data, test_data, y_test_data, test_instances, test_label = load_dataset_from_updated_path(self.data_set_name)
         self.model = load_model_from_updated_path(self.data_set_name)
-        self.base_instance_id: int = 7
+        self.base_instance_id: int = 4
         self.step_size: float = 0.01
         self.width: float = 0.5
         self.train_data = train_data
         self.y_train_data = y_train_data
         self.test_data = test_data
+        print(len(train_data))
+        print(len(y_train_data))
+        print(len(test_data))
+        print(len(y_test_data))
+        print(len(test_instances))
+        print(len(test_label))
         self.y_test_data = y_test_data
         self.test_instances = test_instances
         self.test_label = test_label
@@ -50,6 +57,8 @@ class DataProvider():
 
         self.pdp_info_dict = self.calc_pdp_values()
         self.shap_df = self.get_shap_info()
+
+        self.class_colors = self.set_class_colors()
 
     def change_dataset(self, dataset_name):
         self.data_set_name = dataset_name
@@ -81,6 +90,8 @@ class DataProvider():
         self.set_shap_values()
         self.pdp_info_dict = self.calc_pdp_values()
         self.shap_df = self.get_shap_info()
+
+        self.class_colors = self.set_class_colors()
 
 
     def set_boundary_data(self):
@@ -154,6 +165,8 @@ class DataProvider():
         dimension_combs = self.requested_dims
         near_instance_probs = model_wrapper(self.near_instances[0], self.model)
         #near_instance_probs_res = np.argmax(near_instance_probs, axis=1)
+        print('data colors')
+        print(self.class_colors)
 
         for comp in dimension_combs:
             figure_data = {
@@ -171,7 +184,8 @@ class DataProvider():
                 'lower_bounds': self.lower_ends,
                 'upper_bounds': self.upper_ends,
                 'pdp_data': self.pdp_info_dict,
-                'shap_df': self.shap_df
+                'shap_df': self.shap_df,
+                'class_colors': self.class_colors
             }
             liste.append(figure_data)
         if len(liste) < 7:
@@ -183,7 +197,18 @@ class DataProvider():
     def get_class_names(self):
         if self.data_set_name == 'iris':
             return ['Iris-setosa', 'Iris-versicolor', 'Iris-virginica']
-        return ['class_1', 'class_2']
+        return ['neutral', 'dangerous']
+
+    def set_class_colors(self):
+        low_color = 'purple'
+        high_color = 'yellow'
+        number_of_classes = 3 if self.data_set_name == 'iris' else 2
+
+
+        cmap = mcolors.LinearSegmentedColormap.from_list('custom_cmap', [low_color, high_color], N=number_of_classes)
+        colors = [cmap(i/number_of_classes) for i in range(number_of_classes)]
+        hex_colors = [f"#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}" for r, g, b, a in colors]
+        return hex_colors
 
 
     def set_feature_names(self):
@@ -196,13 +221,13 @@ class DataProvider():
             ]
         else:
             feature_names = [
-                'feat-1',
-                'feat-2',
-                'feat-3',
-                'feat-4',
-                'feat-5',
-                'feat-6',
-                'feat-7'
+                'baseline value',
+                'accelerations,',
+                'fetal_movement',
+                'uterine_contractions',
+                'prolongued_decelerations',
+                'abnormal_short_term_variability',
+                'histogram_width'
             ]
         return feature_names
 
@@ -213,10 +238,15 @@ class DataProvider():
             z=corr,
             x=self.feature_names,
             y=self.feature_names,
-            colorscale='RdBu',
+            colorscale='Plasma',
             zmin=-1, zmax=1
         ))
         fig.update_layout(title='Correlation Matrix')
+        fig.update_layout(
+            title='Correlation Matrix',
+            xaxis=dict(tickangle=30),
+            yaxis=dict(tickangle=-50)
+        )
         return fig
 
     def get_prediction(self):
@@ -247,9 +277,11 @@ class DataProvider():
         probabilities = np.exp(all_logits) / np.sum(np.exp(all_logits), axis=1, keepdims=True)
 
         class_names = self.get_class_names()
-        met1 = self.run_metric1()
-        instance_distri = met1[0][0]
-        val_dict = {class_names[i]: instance_distri[i] for i, val in enumerate(instance_distri) }
+        #met1 = self.run_metric1()
+        #instance_distri = met1[0][0]
+        #val_dict = {class_names[i]: instance_distri[i] for i, val in enumerate(instance_distri) }
+        val_dict = {'class_names[i]': 'instance_distri[i]' for i in range(3) }
+        print(val_dict)
 
         data_dict = {
             'distribution of classes in the instance neighbourhood': val_dict,
@@ -260,7 +292,16 @@ class DataProvider():
         temp = []
         for k, v in self.fact_dict.items():
             v = v.round(6)
-            dims_name = f'{self.feature_names[k[0]]}/{self.feature_names[k[1]]}'
+
+
+            def truncate_text(text, length=13):
+                return text[:length] + "..." if len(text) > length else text
+
+
+            #dims_name = f'{self.feature_names[k[0]]}/{self.feature_names[k[1]]}'
+            dims_name = f'{truncate_text(self.feature_names[k[0]])}/{truncate_text(self.feature_names[k[1]])}'
+
+            #dims_name = truncate_text(dims_name)
             t = {'dimensions': f'{dims_name}', 'overall distance': v.iloc[3,0], 'nearest DB point': f'{v.iloc[1,0]} / {v.iloc[1,1]}'}
             temp.append(t)
         return temp

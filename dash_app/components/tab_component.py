@@ -60,7 +60,17 @@ def create_chart_settings_tab(data_provider, data_provider_list):
 
     component = html.Div(style={'width': '98%', 'display': 'flex', 'flexDirection': 'column', 'flex': 1},
                          children=[
+                             #html.Div(style={'width': '100%', 'display': 'flex', 'flexDirection': 'column', 'flex': 1,
+                             #                'margin': '5px'},
+                             #         children=[
+                             #             html.Label('test'),
+                             #             html.Div([
+                             #                 html.Details([
+                             #                     html.Summary('What'),
+                             #                     html.Div('Is That')
+                             #                 ]) for x in range(4)])
 
+                             #         ]),
 
                              html.Div(style={'width': '100%', 'display': 'flex', 'flexDirection': 'column', 'flex': 1,
                                              'margin': '5px'},
@@ -203,6 +213,7 @@ def create_decision_boundary_tab(data_dict, table_data):
             ))
 
         info_elements.append(html.Div(
+            #[html.H5(outer_key), html.Div(inner_info_elements, style={'display': 'flex'})],
             [html.H5(outer_key), html.Div(inner_info_elements, style={'display': 'flex'})],
             style={'border': '1px solid #ccc', 'padding': '5px', 'margin': '5px'}
         ))
@@ -224,12 +235,12 @@ def create_decision_boundary_tab(data_dict, table_data):
         )
         div = html.Div([datatable], style={'border': '1px solid #ccc', 'padding': '5px', 'margin': '5px'})
 
-    return dcc.Tab(label='decision boundary information', children=[*info_elements, div], style={'backgroundColor': '#e0e0e0'})
+    return dcc.Tab(label='decision boundary information', children=[div], style={'backgroundColor': '#e0e0e0'})
 
 
 def create_feature_information_tab(class_names):
     dropdown_options = [
-        {'label': 'feature distribution training-data', 'value': '6'},
+        {'label': 'feature distribution: training-data', 'value': '6'},
         {'label': 'correlation matrix', 'value': '2'},
         *[{'label': f'shap summary chart ({name})', 'value': f'{index + 3}'} for index, name in enumerate(class_names)],
     ]
@@ -263,19 +274,19 @@ def set_feature_information_tab_content(dropdown_value, data_provider):
 
     if dropdown_value == '3':
         shap_values = data_provider.shap_values
-        shap_fig_1 = create_shap_summary_plot_for_single_class(shap_values, data_provider.feature_names, 0,
+        shap_fig_1 = create_shap_summary_plot_for_single_class(shap_values, data_provider.feature_names, 0, data_provider.train_data,
                                                                data_provider.base_instance_id)
         return html.Div(children=[html.P(''), dcc.Graph(figure=shap_fig_1)])
 
     if dropdown_value == '4':
         shap_values = data_provider.shap_values
-        shap_fig_2 = create_shap_summary_plot_for_single_class(shap_values, data_provider.feature_names, 1,
+        shap_fig_2 = create_shap_summary_plot_for_single_class(shap_values, data_provider.feature_names, 1, data_provider.train_data,
                                                                data_provider.base_instance_id)
         return html.Div(children=[html.P(''), dcc.Graph(figure=shap_fig_2)])
 
     if dropdown_value == '5':
         shap_values = data_provider.shap_values
-        shap_fig_3 = create_shap_summary_plot_for_single_class(shap_values, data_provider.feature_names, 2,
+        shap_fig_3 = create_shap_summary_plot_for_single_class(shap_values, data_provider.feature_names, 2, data_provider.train_data,
                                                                data_provider.base_instance_id)
         return html.Div(children=[html.P(''), dcc.Graph(figure=shap_fig_3)])
 
@@ -405,7 +416,7 @@ def create_kde(data_provider, index):
     return fig
 
 
-def create_shap_summary_plot_for_single_class(shap_values, features, class_index, highlight_instance=None):
+def create_shap_summary_plot_for_single_class(shap_values, features, class_index, instances, highlight_instance=None):
     num_instances, num_features, num_classes = shap_values.shape
 
     fig = go.Figure()
@@ -413,6 +424,19 @@ def create_shap_summary_plot_for_single_class(shap_values, features, class_index
     for feature_idx in range(num_features):
         feature_name = features[feature_idx]
         feature_shap_vals = shap_values[:, feature_idx, class_index]
+        raw_values = np.array(instances)[:, feature_idx]
+
+        # Optional: Clip extremes to reduce outlier impact
+        clipped = np.clip(raw_values, np.percentile(raw_values, 1), np.percentile(raw_values, 99))
+
+        # Normalize to [0, 1]
+        min_val, max_val = np.min(clipped), np.max(clipped)
+        if min_val == max_val:
+            instance_values = np.full_like(clipped, 0.5)
+        else:
+            instance_values = (clipped- min_val) / (max_val - min_val)
+
+
 
         y_range = (-20, 20)
         if y_range is not None:
@@ -420,25 +444,27 @@ def create_shap_summary_plot_for_single_class(shap_values, features, class_index
             feature_shap_vals_normalized = (feature_shap_vals - np.min(feature_shap_vals)) / (np.max(feature_shap_vals) - np.min(feature_shap_vals))
             feature_shap_vals = ymin + feature_shap_vals_normalized * (ymax - ymin)
 
+
+        feature_name = feature_name[:15] + "..." if len(feature_name) > 15 else feature_name
         fig.add_trace(go.Scatter(
             x=feature_shap_vals,
             y=[feature_name] * len(feature_shap_vals),
             mode='markers',
             marker=dict(
-                size=np.abs(feature_shap_vals) * 1,
-                color=feature_shap_vals,
-                colorscale='RdBu',
-                showscale=True,
-                colorbar=dict(
-                    title=f"Val (Class {class_index + 1})",
-                    lenmode="fraction",
-                    len=1.4,
-                    orientation="h",
-                    x=0.3,
-                    y=-0.4,
-                    yanchor="bottom",
-                    xanchor="center"
-                )
+                size=6,
+                color='blue',
+                colorscale='Plasma',
+                showscale=False,
+                #colorbar=dict(
+                #    #title=f"Val (Class {class_index + 1})",
+                #    lenmode="fraction",
+                #    len=1.4,
+                #    orientation="h",
+                #    x=0.3,
+                #    y=-0.4,
+                #    yanchor="bottom",
+                #    xanchor="center"
+                #)
             ),
             name=f'Class {class_index + 1} - {feature_name}',
             orientation='v',
@@ -462,9 +488,12 @@ def create_shap_summary_plot_for_single_class(shap_values, features, class_index
             ))
 
     fig.update_layout(
-        title=f"SHAP Summary Plot (Class {class_index + 1})",
+        #title=f"SHAP Summary Plot (Class {class_index + 1})",
         xaxis_title="SHAP Value",
         yaxis_title="Feature",
         height=550,
     )
+
+    fig.update_layout(yaxis=dict(tickangle=-45))
+
     return fig
